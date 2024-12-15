@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<style>
+  html {
+    font-family: Arial, sans-serif;
+    display: inline-block;
+    margin: 0px auto;
+    text-align: center;
+    background-color: #f0f0f0;
+  }
+
+  h1 {
+    color: #070812;
+    padding: 2vh;
+    font-size: 2.5rem;
+  }
+
+  .button {
+    display: inline-block;
+    background-color: #5FDA2A;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    padding: 16px 40px;
+    text-decoration: none;
+    font-size: 1.5rem;
+    margin: 2px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+  }
+
+  .button:hover {
+    background-color: #83f153;
+    transform: translateY(-2px);
+  }
+
+  .button2 {
+    background-color: #5FDA2A;
+  }
+
+  .button2:hover {
+    background-color: #5FDA2A;
+    transform: translateY(-2px);
+  }
+
+  .content {
+    padding: 50px;
+  }
+
+  .card-grid {
+    max-width: 800px;
+    margin: 0 auto;
+    display: grid;
+    grid-gap: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .card {
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+
+  .card-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #034078;
+    padding: 16px;
+    background-color: #f7f7f7;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .card-content {
+    padding: 16px;
+    font-size: 1rem;
+    color: #333;
+  }
+
+  .form-group {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 10px 0;
+    width: 100%;
+  }
+
+  .form-group label {
+    font-size: 1.2rem;
+    margin-right: 10px;
+    align-items: center;
+  }
+
+  label {
+    font-size: 1.2rem;
+    display: block;
+    margin-top: 10px;
+    margin-left: 10px;
+  }
+
+  table {
+    width: 95%;
+    font-family: arial, sans-serif;
+    border-collapse: collapse;
+    margin: 20px auto;
+    font-size: 1rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  td,
+  th {
+    border: 1px solid #dddddd;
+    text-align: center;
+    padding: 12px 15px;
+    width: 25%;
+  }
+
+  tr:nth-child(1) {
+    background-color: #acadb3;
+  }
+
+  .green {
+    background-color: #5FDA2A;
+    color: white;
+  }
+
+  .red {
+    background-color: #db3535;
+    color: white;
+  }
+
+  tr.selected {
+    background-color: rgb(208, 211, 218);
+    color: #FFF;
+  }
+</style>
+<link rel="icon" href="data:,">
+
+<head>
+  <link rel="icon" href="data:,">
+  <title>AutoTuner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+</head>
+
+<body>
+  <h1>AutoTuner</h1>
+  <div class="content">
+    <div class="card-grid">
+      <div class="card">
+        <div class="form-group">
+          <label for="instruments">Instrument</label>
+          <select name="instruments" id="instruments">
+            <!-- arg1 start -->
+            <option value="%d" strings="">%d String</option>
+            <!-- arg1 end -->
+          </select>
+          <label for="tuning">Tuning</label>
+          <select name="tuning" id="tuning">
+            <!-- arg2 start -->
+            <option value="%d">%d%s</option>
+            <!-- arg2 end -->
+          </select>
+        </div>
+        <p>
+          <a id="changeButton" href="?instrument=0&tuning=0"><button class="button">Apply changes</button></a>
+        </p>
+        <p>
+        <table id="stringTable">
+          <tr>
+            <th>Strings</th>
+            <th>Current(Hz)</th>
+            <th>Goal(Hz)</th>
+            <th>Note</th>
+          </tr>
+          <!-- arg3 start -->
+          <tr id="selected">
+            <th>String%d</th>
+            <th>%d</th>
+            <th>%d</th>
+            <th>%d</th>
+          </tr>
+          <!-- arg3 end -->
+        </table>
+        </p>
+      </div>
+    </div>
+  </div>
+  <script>
+    var ajaxRequest1 = new XMLHttpRequest();
+    var ajaxRequest2 = new XMLHttpRequest();
+    var changeButton = document.getElementById("changeButton");
+    var instrumentSelector = document.getElementById("instruments");
+    var tuningSelector = document.getElementById("tuning");
+    var table = document.getElementById("stringTable");
+
+    function selectionChange(evt) {
+      changeButton.href = '?instrument=' + instrumentSelector.value + '&tuning=' + tuningSelector.value;
+      console.log(changeButton.href);
+      ajaxUpdateLoadTable();
+    };
+
+    function colorData() {
+      for (let i = 1; i < table.rows.length; i++) {
+        const cells = table.rows[i].cells;
+        const current = parseFloat(cells[1].innerText);
+        const goal = parseFloat(cells[2].innerText);
+
+        if (current === goal || Math.abs(current - goal) <= threshold) {
+          cells[1].classList.add('green');
+        } else {
+          cells[1].classList.add('red');
+        }
+      }
+    };
+
+    function parseCSV(csv) {
+      const lines = csv.split("\n");
+      const result = [];
+      const headers = lines[0].split(";");
+
+      for (let i = 1; i < lines.length; i++) {
+        const obj = {};
+        const currentline = lines[i].split(";");
+
+        for (let j = 0; j < headers.length; j++) {
+          obj[headers[j]] = currentline[j];
+        }
+
+        result.push(obj);
+      }
+      console.log(result);
+      return result;
+    };
+
+    function ajaxUpdateLoadTable() {
+      ajaxRequest1.open('GET', "?updateTable", true);
+      ajaxRequest1.onreadystatechange = function () {
+        if (ajaxRequest1.readyState == 4 && ajaxRequest1.status == 200) {
+          var ajaxResult = ajaxRequest1.responseText;
+          console.log(ajaxResult);
+          var tmpArray = ajaxResult.split("\n");
+          var csvData = tmpArray.slice(0, -1).join('\n');
+          var data = parseCSV(csvData);
+          var selectedId = tmpArray[tmpArray.length - 1].trim();
+          updateTable(data, selectedId);
+          colorData();
+        }
+      };
+      ajaxRequest1.send();
+    };
+
+    function ajaxUpdateLoadChoices() {
+      ajaxRequest2.open('GET', '?updateChoices', true);
+      ajaxRequest2.onreadystatechange = function () {
+        if (ajaxRequest2.readyState == 4 && ajaxRequest2.status == 200) {
+          var ajaxResult = ajaxRequest2.responseText;
+          console.log(ajaxResult);
+          var data = parseCSV(ajaxResult);
+          updateChoices(data);
+        }
+      };
+      ajaxRequest2.send();
+    };
+
+    function updateChoices(data) {
+      instrumentSelector.innerHTML = '';
+      tuningSelector.innerHTML = '';
+
+      data.forEach(item => {
+        var option1 = document.createElement('option');
+        var option2 = document.createElement('option');
+        option1.value = item.ivalue;
+        option1.text = item.itext;
+        option2.value = item.tvalue;
+        option2.text = item.ttext;
+        instrumentSelector.appendChild(option1);
+        tuningSelector.appendChild(option2);
+        console.log(item);
+        console.log(option1);
+        console.log(option2);
+      });
+    };
+
+    function updateTable(data, selectedId) {
+      while (table.rows.length > 1) {
+        table.deleteRow(1);
+      };
+
+      data.forEach(item => {
+        const row = table.insertRow();
+        const cell1 = row.insertCell(0);
+        const cell2 = row.insertCell(1);
+        const cell3 = row.insertCell(2);
+        const cell4 = row.insertCell(3);
+
+        cell1.innerHTML = item.string;
+        cell2.innerHTML = item.current;
+        cell3.innerHTML = item.goal;
+        cell4.innerHTML = item.note;
+        cell4.id = item.id;
+      });
+
+      table.getElementById(selectedId).classList.add('selected');
+    }
+
+    instrumentSelector.addEventListener("change", selectionChange);
+    tuningSelector.addEventListener("change", selectionChange);
+
+    ajaxUpdateLoadChoices();
+    setInterval(ajaxUpdateLoadTable, 1000);
+  </script>
+</body>
+
+</html>
